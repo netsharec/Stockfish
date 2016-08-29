@@ -168,7 +168,7 @@ namespace {
   Value value_to_tt(Value v, int ply);
   Value value_from_tt(Value v, int ply);
   void update_pv(Move* pv, Move move, Move* childPv);
-  void update_cm_stats(Stack* ss, Piece pc, Square s, Value bonus);
+  void update_cm_stats(const Position& pos, Stack* ss, Piece pc, Square s, Value bonus);
   void update_stats(const Position& pos, Stack* ss, Move move, Move* quiets, int quietsCnt, Value bonus);
   void check_time();
 
@@ -654,7 +654,7 @@ namespace {
             {
                 Value penalty = Value(d * d + 4 * d + 1);
                 Square prevSq = to_sq((ss-1)->currentMove);
-                update_cm_stats(ss-1, pos.piece_on(prevSq), prevSq, -penalty);
+                update_cm_stats(pos, ss-1, pos.piece_on(prevSq), prevSq, -penalty);
             }
         }
         return ttValue;
@@ -1144,7 +1144,7 @@ moves_loop: // When in check search starts from here
         {
             Value penalty = Value(d * d + 4 * d + 1);
             Square prevSq = to_sq((ss-1)->currentMove);
-            update_cm_stats(ss-1, pos.piece_on(prevSq), prevSq, -penalty);
+            update_cm_stats(pos, ss-1, pos.piece_on(prevSq), prevSq, -penalty);
         }
     }
     // Bonus for prior countermove that caused the fail low
@@ -1155,7 +1155,7 @@ moves_loop: // When in check search starts from here
         int d = depth / ONE_PLY;
         Value bonus = Value(d * d + 2 * d - 2);
         Square prevSq = to_sq((ss-1)->currentMove);
-        update_cm_stats(ss-1, pos.piece_on(prevSq), prevSq, bonus);
+        update_cm_stats(pos, ss-1, pos.piece_on(prevSq), prevSq, bonus);
     }
 
     tte->save(posKey, value_to_tt(bestValue, ss->ply),
@@ -1417,7 +1417,10 @@ moves_loop: // When in check search starts from here
 
   // update_cm_stats() updates countermove and follow-up move history
 
-  void update_cm_stats(Stack* ss, Piece pc, Square s, Value bonus) {
+  void update_cm_stats(const Position& pos, Stack* ss, Piece pc, Square s, Value bonus) {
+
+    if (pos.this_thread()->idx >= 7)
+        return;
 
     CounterMoveStats* cmh  = (ss-1)->counterMoves;
     CounterMoveStats* fmh1 = (ss-2)->counterMoves;
@@ -1450,7 +1453,7 @@ moves_loop: // When in check search starts from here
     Thread* thisThread = pos.this_thread();
     thisThread->fromTo.update(c, move, bonus);
     thisThread->history.update(pos.moved_piece(move), to_sq(move), bonus);
-    update_cm_stats(ss, pos.moved_piece(move), to_sq(move), bonus);
+    update_cm_stats(pos, ss, pos.moved_piece(move), to_sq(move), bonus);
 
     if ((ss-1)->counterMoves)
     {
@@ -1463,7 +1466,7 @@ moves_loop: // When in check search starts from here
     {
         thisThread->fromTo.update(c, quiets[i], -bonus);
         thisThread->history.update(pos.moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
-        update_cm_stats(ss, pos.moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
+        update_cm_stats(pos, ss, pos.moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
     }
   }
 
